@@ -19,6 +19,7 @@ const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, originalImage }) => {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const handleActionClick = (type: 'download' | 'save') => {
+    console.log('🖱️ handleActionClick invoked, type=', type);
     setModalType(type);
     setShowEmailModal(true);
   };
@@ -31,6 +32,9 @@ const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan, originalImage }) => {
     }
     
     console.log(`Captured email for ${modalType}:`, email);
+
+    // Debug: detect accidental auto-submit or automatic modal actions
+    console.log('📢 handleEmailSubmit called; modalType=', modalType, 'isGeneratingPdf=', isGeneratingPdf);
     
     if (modalType === 'download') {
         setIsGeneratingPdf(true);
