@@ -24,6 +24,6 @@ export default defineConfig({
     outDir: 'dist',
   },
   define: {
-    'import.meta.env.VITE_API_KEY': JSON.stringify(envVars.VITE_API_KEY || process.env.VITE_API_KEY || '')
+    'import.meta.env.VITE_ANTHROPIC_API_KEY': JSON.stringify(envVars.VITE_ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY || '')
   }
 })

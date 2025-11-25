@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.30.0",
+    "@anthropic-ai/sdk": "^0.24.3",
     "jspdf": "^3.0.4",
     "jspdf-autotable": "^5.0.2",
     "lucide-react": "^0.475.0",

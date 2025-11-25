@@ -1,58 +1,11 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import { WoodworkingPlan, UnitSystem, Difficulty, WoodType } from "../types";
 
 const getAIClient = () => {
   // @ts-ignore - Vite provides import.meta.env
-  const apiKey = import.meta.env.VITE_API_KEY as string | undefined;
-  if (!apiKey) throw new Error('Gemini API key not configured (VITE_API_KEY)');
-  return new GoogleGenAI({ apiKey });
-};
-
-const planSchema: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    title: { type: Type.STRING },
-    description: { type: Type.STRING },
-    estimatedCost: { type: Type.STRING },
-    estimatedRetailPrice: { type: Type.STRING },
-    estimatedTime: { type: Type.STRING },
-    overallDimensions: {
-      type: Type.OBJECT,
-      properties: {
-        height: { type: Type.STRING },
-        width: { type: Type.STRING },
-        depth: { type: Type.STRING },
-      },
-      required: ["height", "width", "depth"],
-    },
-    shoppingList: { type: Type.ARRAY, items: { type: Type.STRING } },
-    cutList: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          partName: { type: Type.STRING },
-          quantity: { type: Type.NUMBER },
-          thickness: { type: Type.STRING },
-          width: { type: Type.STRING },
-          length: { type: Type.STRING },
-          material: { type: Type.STRING },
-          notes: { type: Type.STRING },
-        },
-      },
-    },
-    assemblySteps: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          stepNumber: { type: Type.INTEGER },
-          instruction: { type: Type.STRING },
-        },
-      },
-    },
-    svgBlueprint: { type: Type.STRING },
-  },
+  const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined;
+  if (!apiKey) throw new Error('Anthropic API key not configured (VITE_ANTHROPIC_API_KEY)');
+  return new Anthropic({ apiKey });
 };
 
 export async function generatePlanFromImage(
@@ -62,9 +15,10 @@ export async function generatePlanFromImage(
   woodType: WoodType
 ): Promise<WoodworkingPlan & { svgBlueprint?: string }> {
   try {
-    const ai = getAIClient();
-    const model = "gemini-2.5-flash";
+    const client = getAIClient();
+    const model = "claude-opus-4-1-20250805";
 
+    // Extract MIME type from data URI if present
     const match = base64Image.match(/^data:(.+);base64,(.+)$/);
     const mimeType = match ? match[1] : "image/jpeg";
     const data = match ? match[2] : base64Image;
@@ -83,52 +37,116 @@ export async function generatePlanFromImage(
 
     const materialInstructions = `Primary Material Preference: ${woodType}. Base cost estimates on this material price.`;
 
-    console.log('📡 Calling Gemini API with structured schema...');
-    const startTime = performance.now();
+    const systemPrompt = `You are an expert master carpenter. Analyze furniture images and create detailed, practical woodworking plans in valid JSON format.
 
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: {
-        parts: [
-          {
-            inlineData: {
-              data: data,
-              mimeType: mimeType,
-            },
-          },
-          {
-            text: `Analyze this image of a furniture piece and create a detailed woodworking plan.
+When given an image and configuration, you must:
+1. Analyze the furniture piece in detail
+2. Create a comprehensive cut list with exact dimensions
+3. Estimate realistic material costs and retail price
+4. Provide step-by-step assembly instructions
+5. Return ONLY valid JSON matching the exact schema provided
+
+Always return valid JSON - never include markdown, code blocks, or explanations.`;
+
+    const userPrompt = `Analyze this furniture image and create a detailed woodworking plan.
 
 CONFIGURATION:
 1. ${unitInstructions}
 2. Difficulty Level: ${difficulty}. ${difficultyInstructions}
 3. ${materialInstructions}
 
-Estimate the cost of materials (Lumber + Screws) vs the cost of buying this item new (Retail Price).
+Estimate the cost of materials (Lumber + Screws + Hardware) vs the cost of buying this item new (Retail Price).
 Make the Retail Price realistic for a high-end store (e.g. West Elm/Pottery Barn) to highlight savings.
 
-Provide a complete cut list, shopping list, and assembly steps.`,
-          },
-        ],
-      },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: planSchema,
-        systemInstruction: "You are an expert master carpenter. You generate precise, safe, and efficient woodworking plans from photos. Do not generate images, only text data.",
-      },
+Return ONLY this JSON structure (no markdown, no extra text):
+{
+  "title": "Furniture name",
+  "description": "Detailed description",
+  "estimatedCost": "$50-75",
+  "estimatedRetailPrice": "$800",
+  "estimatedTime": "4-6 hours",
+  "overallDimensions": {
+    "height": "36\\"",
+    "width": "24\\"",
+    "depth": "12\\""
+  },
+  "shoppingList": ["2x4 lumber...", "Screws...", "Wood glue..."],
+  "cutList": [
+    {
+      "partName": "Leg",
+      "quantity": 4,
+      "thickness": "3/4\\"",
+      "width": "2\\"",
+      "length": "36\\"",
+      "material": "Oak",
+      "notes": "Cut at 90 degrees"
+    }
+  ],
+  "assemblySteps": [
+    {
+      "stepNumber": 1,
+      "instruction": "Cut all pieces according to the cut list..."
+    }
+  ]
+}`;
+
+    console.log('📡 Calling Claude API with vision...');
+    const startTime = performance.now();
+
+    const response = await client.messages.create({
+      model: model,
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: mimeType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+                data: data,
+              },
+            },
+            {
+              type: "text",
+              text: userPrompt,
+            },
+          ],
+        },
+      ],
     });
 
     const elapsed = performance.now() - startTime;
     console.log(`⏱️  API response received in ${elapsed.toFixed(0)}ms`);
 
-    if (!response.text) {
-      console.error('❌ No response text from Gemini');
-      throw new Error("No response from Gemini AI");
+    // Extract text from response
+    const textContent = response.content.find((block) => block.type === "text");
+    if (!textContent || textContent.type !== "text") {
+      console.error('❌ No text content in response');
+      throw new Error("No text response from Claude API");
     }
 
-    console.log('📝 Response text (first 200 chars):', response.text.substring(0, 200));
+    const responseText = textContent.text;
+    console.log('📝 Response text (first 300 chars):', responseText.substring(0, 300));
 
-    const plan = JSON.parse(response.text) as WoodworkingPlan;
+    // Try to extract JSON from response (in case it's wrapped in markdown)
+    let jsonStr = responseText;
+    const jsonMatch = responseText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      jsonStr = jsonMatch[1];
+      console.log('✅ Extracted JSON from markdown block');
+    } else {
+      // Try to find JSON object directly
+      const directMatch = responseText.match(/\{[\s\S]*\}/);
+      if (directMatch) {
+        jsonStr = directMatch[0];
+        console.log('✅ Found direct JSON object');
+      }
+    }
+
+    const plan = JSON.parse(jsonStr) as WoodworkingPlan;
     console.log('✅ Successfully parsed plan:', plan.title);
     return plan;
 
