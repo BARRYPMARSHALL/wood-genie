@@ -1,0 +1,7 @@
+{
+  "name": "Wood Genie",
+  "description": "Snap a photo of furniture to generate instant woodworking plans, cut lists, and blueprints using Gemini AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

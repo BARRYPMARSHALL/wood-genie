@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "strict": false,  // Temporarily loosen if needed
+    "skipLibCheck": true,
+    "noEmit": true,
+    "jsx": "react-jsx"
+  },
+  "include": ["src"]
+}
