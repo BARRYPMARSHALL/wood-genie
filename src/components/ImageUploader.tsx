@@ -1,3 +1,136 @@
+import React, { useRef, useState } from 'react';
+import { UnitSystem, Difficulty, WoodType } from '../types';
+
+interface Props {
+  onImageSelected: (base64: string) => void;
+  isLoading: boolean;
+  unitSystem: UnitSystem;
+  setUnitSystem: (u: UnitSystem) => void;
+  difficulty: Difficulty;
+  setDifficulty: (d: Difficulty) => void;
+  woodType: WoodType;
+  setWoodType: (w: WoodType) => void;
+}
+
+const ImageUploader: React.FC<Props> = ({ onImageSelected, isLoading, unitSystem, setUnitSystem, difficulty, setDifficulty, woodType, setWoodType }) => {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFiles = async (file: File | null) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      onImageSelected(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    handleFiles(f || null);
+  };
+
+  const onSelectFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+      <div>
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          className={`rounded-xl border-2 ${dragOver ? 'border-amber-400 bg-amber-50' : 'border-dashed border-slate-200 bg-white'} p-8 text-center min-h-[260px] flex flex-col items-center justify-center`}
+        >
+          <input ref={fileInputRef} type="file" accept="image/*" className="hidden" capture="environment" onChange={(e) => handleFiles(e.target.files ? e.target.files[0] : null)} />
+          <div className="text-slate-700 font-semibold mb-4">Drop a photo or use your camera</div>
+          <div className="flex gap-3">
+            <button onClick={onSelectFile} disabled={isLoading} className="px-4 py-2 bg-amber-500 text-slate-900 rounded-lg font-semibold">Select File</button>
+            <label className="px-4 py-2 bg-slate-800 text-white rounded-lg cursor-pointer">
+              <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFiles(e.target.files ? e.target.files[0] : null)} />
+              Camera
+            </label>
+          </div>
+          <p className="text-sm text-slate-400 mt-4">We analyze the photo and return a detailed woodworking plan — free.</p>
+        </div>
+
+        <div className="mt-6 bg-white rounded-lg p-4 border border-slate-100">
+          <h4 className="font-bold text-slate-800 mb-3">Configuration</h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-500">Units</label>
+              <div className="mt-2 flex gap-2">
+                <button onClick={() => setUnitSystem('imperial')} className={`px-3 py-2 rounded ${unitSystem==='imperial' ? 'bg-amber-500 text-slate-900' : 'bg-slate-100 text-slate-700'}`}>Imperial</button>
+                <button onClick={() => setUnitSystem('metric')} className={`px-3 py-2 rounded ${unitSystem==='metric' ? 'bg-amber-500 text-slate-900' : 'bg-slate-100 text-slate-700'}`}>Metric</button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-slate-500">Skill</label>
+              <div className="mt-2 flex gap-2">
+                <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)} className="w-full rounded px-3 py-2 border border-slate-200">
+                  <option>Beginner</option>
+                  <option>Intermediate</option>
+                  <option>Advanced</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="text-xs text-slate-500">Material</label>
+              <div className="mt-2">
+                <select value={woodType} onChange={(e) => setWoodType(e.target.value as WoodType)} className="w-full rounded px-3 py-2 border border-slate-200">
+                  <option>Pine/Construction Lumber</option>
+                  <option>Oak/Hardwood</option>
+                  <option>Plywood/MDF</option>
+                  <option>Reclaimed Wood</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside>
+        <div className="bg-white rounded-xl p-6 border border-slate-100 shadow-sm">
+          <div className="font-mono text-xs text-slate-400 mb-4">Preview</div>
+          <div className="bg-slate-50 rounded p-4">
+            <div className="h-8 bg-white rounded shadow-sm mb-3 flex items-center justify-between px-3">
+              <div className="text-sm font-bold">Wood Genie</div>
+              <div className="text-xs text-slate-400">Plan Preview</div>
+            </div>
+            <div className="h-40 border border-dashed border-slate-200 rounded p-3 flex flex-col justify-between">
+              <div>
+                <div className="font-semibold text-slate-800">Modern Shelf Unit</div>
+                <svg width="120" height="60" viewBox="0 0 120 60" className="mt-2">
+                  <rect x="5" y="10" width="110" height="40" fill="#fff" stroke="#e2e8f0" />
+                  <line x1="5" y1="30" x2="115" y2="30" stroke="#e2e8f0" />
+                </svg>
+              </div>
+              <div className="text-xs text-slate-500">
+                <div>• Cut list: 6 parts</div>
+                <div>• Time: 3-4 hrs</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 text-center text-sm text-slate-500">Share the result:</div>
+          <div className="mt-3 flex gap-2 justify-center">
+            <button className="px-3 py-2 bg-green-500 text-white rounded">WhatsApp</button>
+            <button className="px-3 py-2 bg-blue-600 text-white rounded">FB</button>
+            <button className="px-3 py-2 bg-red-500 text-white rounded">Pinterest</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+};
+
+export default ImageUploader;
 
 import React, { useRef, useState } from 'react';
 import { Camera, Upload, ImagePlus, Table, FileText, CheckCircle2, Settings2, X, RefreshCw, Ruler } from 'lucide-react';

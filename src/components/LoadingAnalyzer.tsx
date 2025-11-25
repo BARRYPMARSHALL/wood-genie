@@ -1,3 +1,60 @@
+import React, { useEffect, useState } from 'react';
+
+interface Props {
+  imageSrc: string | null;
+}
+
+const LoadingAnalyzer: React.FC<Props> = ({ imageSrc }) => {
+  const [logs, setLogs] = useState<string[]>([]);
+
+  useEffect(() => {
+    const steps = [
+      'Detecting edges and surfaces...',
+      'Identifying joinery...',
+      'Calculating load-bearing paths...',
+      'Optimizing cut patterns...',
+      'Estimating material cost...',
+      'Finalizing instructions...'
+    ];
+
+    let i = 0;
+    setLogs([]);
+    const t = setInterval(() => {
+      setLogs((l) => [...l, steps[i]]);
+      i++;
+      if (i >= steps.length) clearInterval(t);
+    }, 2000);
+
+    return () => clearInterval(t);
+  }, [imageSrc]);
+
+  return (
+    <div className="w-full max-w-3xl mx-auto p-6 bg-white rounded-xl border border-slate-100 shadow-md">
+      <div className="flex gap-6 items-center">
+        <div className="w-48 h-32 bg-slate-100 rounded overflow-hidden flex items-center justify-center">
+          {imageSrc ? <img src={imageSrc} alt="uploaded" className="w-full h-full object-cover" /> : <div className="text-slate-400">No image</div>}
+          <div className="absolute inset-0 pointer-events-none">
+            <div className="h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent animate-scan" style={{ transform: 'translateY(0)' }} />
+          </div>
+        </div>
+
+        <div className="flex-1">
+          <div className="flex justify-between items-center mb-3">
+            <div className="font-bold text-slate-800">Analyzing image</div>
+            <div className="text-xs text-slate-400">Estimated wait: ~15s</div>
+          </div>
+          <div className="bg-slate-900/5 border border-slate-100 rounded p-3 h-36 overflow-auto font-mono text-sm text-slate-700">
+            {logs.map((line, idx) => (
+              <div key={idx} className="mb-2">➤ {line}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default LoadingAnalyzer;
 
 import React, { useEffect, useState } from 'react';
 import { Scan, Cpu, Ruler, Zap } from 'lucide-react';

@@ -1,6 +1,124 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { WoodworkingPlan, UnitSystem, Difficulty, WoodType } from "../types";
 
+const getAIClient = () => {
+  // @ts-ignore - Vite provides import.meta.env
+  const apiKey = import.meta.env.VITE_API_KEY as string | undefined;
+  if (!apiKey) throw new Error('Gemini API key not configured (VITE_API_KEY)');
+  return new GoogleGenAI({ apiKey });
+};
+
+const planSchema: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+    description: { type: Type.STRING },
+    estimatedCost: { type: Type.STRING },
+    estimatedRetailPrice: { type: Type.STRING },
+    estimatedTime: { type: Type.STRING },
+    overallDimensions: {
+      type: Type.OBJECT,
+      properties: {
+        height: { type: Type.STRING },
+        width: { type: Type.STRING },
+        depth: { type: Type.STRING },
+      },
+      required: ["height", "width", "depth"],
+    },
+    shoppingList: { type: Type.ARRAY, items: { type: Type.STRING } },
+    cutList: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          partName: { type: Type.STRING },
+          quantity: { type: Type.NUMBER },
+          thickness: { type: Type.STRING },
+          width: { type: Type.STRING },
+          length: { type: Type.STRING },
+          material: { type: Type.STRING },
+          notes: { type: Type.STRING },
+        },
+      },
+    },
+    assemblySteps: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          stepNumber: { type: Type.INTEGER },
+          instruction: { type: Type.STRING },
+        },
+      },
+    },
+    svgBlueprint: { type: Type.STRING },
+  },
+};
+
+export async function generatePlanFromImage(
+  base64Image: string,
+  units: UnitSystem,
+  difficulty: Difficulty,
+  woodType: WoodType
+): Promise<WoodworkingPlan & { svgBlueprint?: string }> {
+  try {
+    const ai = getAIClient();
+    const model = "gemini-2.5-flash";
+
+    const match = base64Image.match(/^data:(.+);base64,(.+)$/);
+    const mimeType = match ? match[1] : "image/jpeg";
+    const data = match ? match[2] : base64Image;
+
+    const unitInstructions = units === 'imperial'
+      ? "Use IMPERIAL units (Inches, Feet). Assume standard US lumber sizes (e.g., 2x4 is 1.5x3.5 inch)."
+      : "Use METRIC units (Millimeters). Assume standard European timber sizes (e.g., 45x95mm).";
+
+    const prompt = `Analyze this furniture photo and produce a structured woodworking plan in JSON.\nUNITS: ${units}\nSKILL: ${difficulty}\nMATERIAL: ${woodType}\n${unitInstructions}\nRespond strictly as JSON matching the schema.`;
+
+    const response = await ai.models.generateContent({
+      model,
+      contents: {
+        parts: [
+          { inlineData: { data, mimeType } },
+          { text: prompt },
+        ],
+      },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: planSchema,
+        systemInstruction: 'You are an expert carpenter. Return only JSON matching schema.',
+      },
+    });
+
+    if (!response.text) throw new Error('No response from Gemini');
+    const plan = JSON.parse(response.text) as any;
+    return plan as WoodworkingPlan & { svgBlueprint?: string };
+  } catch (err) {
+    console.error('geminiService error:', err);
+    // Fallback demo plan
+    return {
+      title: 'Demo Shelf Unit',
+      description: 'Demo plan used because AI request failed.',
+      estimatedCost: '$50',
+      estimatedTime: '3-4 hours',
+      estimatedRetailPrice: '$800',
+      overallDimensions: { height: '900mm', width: '600mm', depth: '300mm' },
+      shoppingList: ['2x4 x6', 'Wood screws', 'Wood glue'],
+      cutList: [
+        { partName: 'Side', quantity: 2, thickness: '18mm', width: '300mm', length: '900mm', material: 'Plywood' },
+        { partName: 'Shelf', quantity: 3, thickness: '18mm', width: '560mm', length: '280mm', material: 'Plywood' },
+      ],
+      assemblySteps: [
+        { stepNumber: 1, instruction: 'Cut all pieces to size.' },
+        { stepNumber: 2, instruction: 'Assemble sides and shelves using screws and glue.' },
+      ],
+      svgBlueprint: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect x="10" y="20" width="180" height="260" fill="none" stroke="#333"/></svg>',
+    };
+  }
+}
+import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { WoodworkingPlan, UnitSystem, Difficulty, WoodType } from "../types";
+
 // Initialize Gemini AI
 const getAIClient = () => {
   // @ts-ignore - import.meta is available at runtime in Vite
