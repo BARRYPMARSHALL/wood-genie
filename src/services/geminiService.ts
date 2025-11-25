@@ -69,149 +69,17 @@ export async function generatePlanFromImage(
     const mimeType = match ? match[1] : "image/jpeg";
     const data = match ? match[2] : base64Image;
 
-    const unitInstructions = units === 'imperial'
-      ? "Use IMPERIAL units (Inches, Feet). Assume standard US lumber sizes (e.g., 2x4 is 1.5x3.5 inch)."
-      : "Use METRIC units (Millimeters). Assume standard European timber sizes (e.g., 45x95mm).";
-
-    const prompt = `Analyze this furniture photo and produce a structured woodworking plan in JSON.\nUNITS: ${units}\nSKILL: ${difficulty}\nMATERIAL: ${woodType}\n${unitInstructions}\nRespond strictly as JSON matching the schema.`;
-
-    const response = await ai.models.generateContent({
-      model,
-      contents: {
-        parts: [
-          { inlineData: { data, mimeType } },
-          { text: prompt },
-        ],
-      },
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: planSchema,
-        systemInstruction: 'You are an expert carpenter. Return only JSON matching schema.',
-      },
-    });
-
-    if (!response.text) throw new Error('No response from Gemini');
-    const plan = JSON.parse(response.text) as any;
-    return plan as WoodworkingPlan & { svgBlueprint?: string };
-  } catch (err) {
-    console.error('geminiService error:', err);
-    // Fallback demo plan
-    return {
-      title: 'Demo Shelf Unit',
-      description: 'Demo plan used because AI request failed.',
-      estimatedCost: '$50',
-      estimatedTime: '3-4 hours',
-      estimatedRetailPrice: '$800',
-      overallDimensions: { height: '900mm', width: '600mm', depth: '300mm' },
-      shoppingList: ['2x4 x6', 'Wood screws', 'Wood glue'],
-      cutList: [
-        { partName: 'Side', quantity: 2, thickness: '18mm', width: '300mm', length: '900mm', material: 'Plywood' },
-        { partName: 'Shelf', quantity: 3, thickness: '18mm', width: '560mm', length: '280mm', material: 'Plywood' },
-      ],
-      assemblySteps: [
-        { stepNumber: 1, instruction: 'Cut all pieces to size.' },
-        { stepNumber: 2, instruction: 'Assemble sides and shelves using screws and glue.' },
-      ],
-      svgBlueprint: '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect x="10" y="20" width="180" height="260" fill="none" stroke="#333"/></svg>',
-    };
-  }
-}
-import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { WoodworkingPlan, UnitSystem, Difficulty, WoodType } from "../types";
-
-// Initialize Gemini AI
-const getAIClient = () => {
-  // @ts-ignore - import.meta is available at runtime in Vite
-  const apiKey = import.meta.env.VITE_API_KEY as string | undefined;
-  if (!apiKey) {
-    throw new Error('Gemini API key not configured (VITE_API_KEY)');
-  }
-  return new GoogleGenAI({ apiKey });
-};
-
-// Define the response schema for structured output
-const planSchema: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    title: { type: Type.STRING, description: "A creative title for the woodworking project" },
-    description: { type: Type.STRING, description: "A brief summary of the build style and utility" },
-    estimatedCost: { type: Type.STRING, description: "Estimated range for raw materials, e.g. '$40 - $60'" },
-    estimatedTime: { type: Type.STRING, description: "Estimated build time, e.g. '3-4 Hours'" },
-    estimatedRetailPrice: { type: Type.STRING, description: "Estimated price if bought in a store, e.g. '$800'" },
-    overallDimensions: {
-      type: Type.OBJECT,
-      properties: {
-        height: { type: Type.STRING },
-        width: { type: Type.STRING },
-        depth: { type: Type.STRING },
-      },
-      required: ["height", "width", "depth"]
-    },
-    shoppingList: {
-      type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description: "List of raw materials needed to buy."
-    },
-    cutList: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          partName: { type: Type.STRING, description: "e.g., Vertical Leg" },
-          quantity: { type: Type.NUMBER },
-          thickness: { type: Type.STRING, description: "nominal thickness (e.g. 1.5 inch or 38mm)" },
-          width: { type: Type.STRING, description: "nominal width (e.g. 3.5 inch or 89mm)" },
-          length: { type: Type.STRING, description: "length to cut (e.g. 60 inch or 1500mm)" },
-          material: { type: Type.STRING, description: "e.g., 2x4 Pine or 45x95mm Timber" },
-          notes: { type: Type.STRING, description: "Specific cut instructions like 'miter 45 deg'" }
-        },
-        required: ["partName", "quantity", "length", "material"]
-      }
-    },
-    assemblySteps: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          stepNumber: { type: Type.INTEGER },
-          instruction: { type: Type.STRING }
-        },
-        required: ["stepNumber", "instruction"]
-      }
-    }
-  },
-  required: ["title", "estimatedCost", "estimatedTime", "estimatedRetailPrice", "overallDimensions", "shoppingList", "cutList", "assemblySteps"]
-};
-
-export async function generatePlanFromImage(
-  base64Image: string,
-  units: UnitSystem,
-  difficulty: Difficulty,
-  woodType: WoodType
-): Promise<WoodworkingPlan> {
-  console.log('\n🔄 generatePlanFromImage called');
-  console.log('📊 Config:', { units, difficulty, woodType });
-  
-  try {
-    const ai = getAIClient();
-    const model = "gemini-2.5-flash";
-    
-    // Extract base64 data and mime type from Data URI if present
-    const match = base64Image.match(/^data:(.+);base64,(.+)$/);
-    const mimeType = match ? match[1] : "image/jpeg";
-    const data = match ? match[2] : base64Image;
-
     console.log(`📤 Image details: mimeType=${mimeType}, dataLength=${data.length}`);
 
-    const unitInstructions = units === 'imperial' 
-        ? "Use IMPERIAL units (Inches, Feet). Assume standard US lumber sizes (e.g., 2x4 is 1.5x3.5 inch)."
-        : "Use METRIC units (Millimeters). Assume standard European structural timber sizes (e.g., 45x95mm).";
+    const unitInstructions = units === 'imperial'
+      ? "Use IMPERIAL units (Inches, Feet). Assume standard US lumber sizes (e.g., 2x4 is 1.5x3.5 inch)."
+      : "Use METRIC units (Millimeters). Assume standard European structural timber sizes (e.g., 45x95mm).";
 
     const difficultyInstructions = difficulty === 'Beginner'
-        ? "Keep it very simple. Use only basic cuts (90 degree) and screws/glue. Avoid complex joinery like mortise & tenon."
-        : difficulty === 'Advanced'
-        ? "Use professional joinery techniques (dadoes, rabbets, or pocket holes) appropriate for high-quality furniture."
-        : "Balance durability with ease of build. Pocket holes are acceptable.";
+      ? "Keep it very simple. Use only basic cuts (90 degree) and screws/glue. Avoid complex joinery like mortise & tenon."
+      : difficulty === 'Advanced'
+      ? "Use professional joinery techniques (dadoes, rabbets, or pocket holes) appropriate for high-quality furniture."
+      : "Balance durability with ease of build. Pocket holes are acceptable.";
 
     const materialInstructions = `Primary Material Preference: ${woodType}. Base cost estimates on this material price.`;
 
@@ -225,21 +93,21 @@ export async function generatePlanFromImage(
           {
             inlineData: {
               data: data,
-              mimeType: mimeType, 
+              mimeType: mimeType,
             },
           },
           {
-            text: `Analyze this image of a furniture piece and create a detailed woodworking plan. 
-            
-            CONFIGURATION:
-            1. ${unitInstructions}
-            2. Difficulty Level: ${difficulty}. ${difficultyInstructions}
-            3. ${materialInstructions}
-            
-            Estimate the cost of materials (Lumber + Screws) vs the cost of buying this item new (Retail Price).
-            Make the Retail Price realistic for a high-end store (e.g. West Elm/Pottery Barn) to highlight savings.
-            
-            Provide a complete cut list, shopping list, and assembly steps.`
+            text: `Analyze this image of a furniture piece and create a detailed woodworking plan.
+
+CONFIGURATION:
+1. ${unitInstructions}
+2. Difficulty Level: ${difficulty}. ${difficultyInstructions}
+3. ${materialInstructions}
+
+Estimate the cost of materials (Lumber + Screws) vs the cost of buying this item new (Retail Price).
+Make the Retail Price realistic for a high-end store (e.g. West Elm/Pottery Barn) to highlight savings.
+
+Provide a complete cut list, shopping list, and assembly steps.`,
           },
         ],
       },
@@ -263,7 +131,7 @@ export async function generatePlanFromImage(
     const plan = JSON.parse(response.text) as WoodworkingPlan;
     console.log('✅ Successfully parsed plan:', plan.title);
     return plan;
-    
+
   } catch (error) {
     console.error('❌ Error generating plan:', error);
     console.log('⚠️  Falling back to demo result...');
@@ -277,8 +145,7 @@ function generateDemoResult(
   woodType: WoodType
 ): WoodworkingPlan {
   console.log('🔴 WARNING: Using DEMO DATA, not API results');
-  
-  const dimensionSuffix = units === 'imperial' ? '"' : 'mm';
+
   const height = units === 'imperial' ? '36"' : '900mm';
   const width = units === 'imperial' ? '24"' : '600mm';
   const depth = units === 'imperial' ? '12"' : '300mm';
